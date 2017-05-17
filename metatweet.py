@@ -2,9 +2,10 @@
 
 import os
 import json
+import time
 
 from collections import OrderedDict
-from tweepy import OAuthHandler, Stream
+from tweepy import OAuthHandler, Stream, API
 from tweepy.streaming import StreamListener
 
 
@@ -20,14 +21,22 @@ def main():
     auth.set_access_token(access_token, access_token_secret)
 
     # start the stream
-    listener = Listener()
+    listener = Listener(auth)
     stream = Stream(auth, listener)
-    stream.sample()
 
+    while True:
+        try:
+            stream.sample()
+        except Exception as e:
+            print(e)
+            time.sleep(5) 
 
 
 class Listener(StreamListener):
-    blueprint = None
+
+    def __init__(self, auth):
+        self.blueprint = None
+        self.api = API(auth)
 
     def on_status(self, status):
         tweet = status._json
@@ -36,14 +45,16 @@ class Listener(StreamListener):
         else:
             new_blueprint = blueprint(tweet)
             diff = compare(self.blueprint, new_blueprint)
+
             if diff["added"] or diff["changed"]:
                 for path, json_type in diff["added"]:
-                    print("added: %s(%s)" % (path, json_type))
+                    self.send_tweet("added: %s(%s)" % (path, json_type), tweet)
                     self.blueprint[path] = json_type
                 for path, json_type in diff["changed"]:
-                    print("changed: %s(%s)" % (path, json_type))
+                    self.send_tweet("changed: %s(%s)" % (path, json_type), tweet)
                     self.blueprint[path] = json_type
-                # save current state
+
+                # save current blueprint to disk
                 json.dump(
                     self.blueprint, 
                     open("blueprint.json", "w"),
@@ -55,7 +66,15 @@ class Listener(StreamListener):
                 sys.stdout.flush()
 
     def on_error(self, status):
-        print(status)
+        pass
+
+    def send_tweet(self, msg, tweet):
+        tweet_url = "https://twitter.com/%s/status/%s" % (tweet["user"]["screen_name"], tweet["id_str"])
+        try:
+            self.api.update_status(msg + " in " + tweet_url)
+        except Exception as e:
+            print(e)
+        time.sleep(5)
 
 
 def compare(old_bp, new_bp):
@@ -75,6 +94,7 @@ def compare(old_bp, new_bp):
             result["removed"].append([path, json_type])
 
     return result
+
 
 def blueprint(x, prefix=""):
     bp = OrderedDict()
