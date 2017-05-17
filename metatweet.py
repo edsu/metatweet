@@ -78,6 +78,10 @@ class Listener(StreamListener):
 
 
 def compare(old_bp, new_bp):
+    """
+    compare will compare two blueprints and return any changes between them
+    """
+
     if new_bp == old_bp:
         return None
 
@@ -97,6 +101,10 @@ def compare(old_bp, new_bp):
 
 
 def blueprint(x, prefix=""):
+    """
+    blueprint examines an object and generates a blueprint for it, which
+    loosely resembles a list of jq paths and their values.
+    """
     bp = OrderedDict()
 
     pytype = type(x)
