@@ -3,6 +3,7 @@
 import os
 import json
 import time
+import logging
 
 from collections import OrderedDict
 from tweepy import OAuthHandler, Stream, API
@@ -10,6 +11,8 @@ from tweepy.streaming import StreamListener
 
 
 def main():
+
+    logging.basicConfig(filename="metatweet.log", level=logging.INFO)
 
     # get credentials
     e = os.environ.get
@@ -28,42 +31,40 @@ def main():
         try:
             stream.sample()
         except Exception as e:
-            print(e)
+            logging.execption(e)
             time.sleep(5) 
 
 
 class Listener(StreamListener):
 
     def __init__(self, auth):
-        self.blueprint = None
+        self.blueprint = json.load(open("blueprint.json"))
         self.api = API(auth)
+        self.count = 0
 
     def on_status(self, status):
+        self.count += 1
+        if self.count % 10000 == 0:
+            logging.info("inspected %s tweets, %s fields found" % (self.count,
+                len(self.blueprint.keys())))
         tweet = status._json
-        if not self.blueprint:
-            self.blueprint = json.load(open("blueprint.json"))
-        else:
-            new_blueprint = blueprint(tweet)
-            diff = compare(self.blueprint, new_blueprint)
+        new_blueprint = blueprint(tweet)
+        diff = compare(self.blueprint, new_blueprint)
 
-            if diff["added"] or diff["changed"]:
-                for path, json_type in diff["added"]:
-                    self.send_tweet("added: %s(%s)" % (path, json_type), tweet)
-                    self.blueprint[path] = json_type
-                for path, json_type in diff["changed"]:
-                    self.send_tweet("changed: %s(%s)" % (path, json_type), tweet)
-                    self.blueprint[path] = json_type
+        if diff["added"] or diff["changed"]:
+            for path, json_type in diff["added"]:
+                self.send_tweet("added: %s(%s)" % (path, json_type), tweet)
+                self.blueprint[path] = json_type
+            for path, json_type in diff["changed"]:
+                self.send_tweet("changed: %s(%s)" % (path, json_type), tweet)
+                self.blueprint[path] = json_type
 
-                # save current blueprint to disk
-                json.dump(
-                    self.blueprint, 
-                    open("blueprint.json", "w"),
-                    indent=2, 
-                    sort_keys=True)
-            else: 
-                import sys
-                sys.stdout.write(".")
-                sys.stdout.flush()
+            # save current blueprint to disk
+            json.dump(
+                self.blueprint, 
+                open("blueprint.json", "w"),
+                indent=2, 
+                sort_keys=True)
 
     def on_error(self, status):
         pass
@@ -71,9 +72,10 @@ class Listener(StreamListener):
     def send_tweet(self, msg, tweet):
         tweet_url = "https://twitter.com/%s/status/%s" % (tweet["user"]["screen_name"], tweet["id_str"])
         try:
+            logging.info(msg + " in " + tweet_url)
             self.api.update_status(msg + " in " + tweet_url)
         except Exception as e:
-            print(e)
+            logging.exception(e)
         time.sleep(5)
 
 

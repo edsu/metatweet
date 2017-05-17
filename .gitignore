@@ -2,3 +2,4 @@
 .venv
 *.log
 .cache
+env.sh
