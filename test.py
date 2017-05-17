@@ -40,8 +40,8 @@ def test_compare_add_and_remove():
     bp2 = blueprint({"bar": 1})
 
     diff = compare(bp1, bp2)
-    assert diff["added"] ==  [".bar(number)"]
-    assert diff["removed"] == [".foo(string)"]
+    assert diff["added"] ==  [[".bar", "number"]]
+    assert diff["removed"] == [[".foo", "string"]]
     assert diff["changed"] == []
 
 def test_null():

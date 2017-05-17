@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os
+import json
 
 from collections import OrderedDict
 from tweepy import OAuthHandler, Stream
@@ -31,17 +32,23 @@ class Listener(StreamListener):
     def on_status(self, status):
         tweet = status._json
         if not self.blueprint:
-            self.blueprint = blueprint(tweet)
-            print("setting first blueprint")
+            self.blueprint = json.load(open("blueprint.json"))
         else:
             new_blueprint = blueprint(tweet)
             diff = compare(self.blueprint, new_blueprint)
-            if diff:
-                print("added:", len(diff["added"]))
-                print("removed:", len(diff["removed"]))
-                print("changed:", len(diff["changed"]))
-                print()
-                self.blueprint = new_blueprint
+            if diff["added"] or diff["changed"]:
+                for path, json_type in diff["added"]:
+                    print("added: %s(%s)" % (path, json_type))
+                    self.blueprint[path] = json_type
+                for path, json_type in diff["changed"]:
+                    print("changed: %s(%s)" % (path, json_type))
+                    self.blueprint[path] = json_type
+                # save current state
+                json.dump(
+                    self.blueprint, 
+                    open("blueprint.json", "w"),
+                    indent=2, 
+                    sort_keys=True)
             else: 
                 import sys
                 sys.stdout.write(".")
@@ -59,13 +66,13 @@ def compare(old_bp, new_bp):
 
     for path, json_type in new_bp.items():
         if path not in old_bp:
-            result["added"].append("%s(%s)" % (path, json_type))
+            result["added"].append([path, json_type])
         elif old_bp[path] != json_type:
-            result["changed"].append("%s(%s)" % (path, json_type))
+            result["changed"].append([path, json_type])
 
     for path, json_type in old_bp.items():
         if path not in new_bp:
-            result["removed"].append("%s(%s)" % (path, json_type))
+            result["removed"].append([path, json_type])
 
     return result
 
