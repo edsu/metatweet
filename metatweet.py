@@ -31,7 +31,7 @@ def main():
         try:
             stream.sample()
         except Exception as e:
-            logging.execption(e)
+            logging.exception(e)
             time.sleep(5) 
 
 
