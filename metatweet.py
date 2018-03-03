@@ -29,6 +29,7 @@ def main():
 
     while True:
         try:
+            logging.info('starting sample stream')
             stream.sample()
         except Exception as e:
             logging.exception(e)
